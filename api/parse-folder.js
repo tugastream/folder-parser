@@ -8,11 +8,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch da pasta (Node 24 já tem fetch nativo)
-    const response = await fetch(url, { redirect: "follow" });
+    // Fetch com User-Agent real (evita 403 em muitos servidores)
+    const response = await fetch(url, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml"
+      }
+    });
 
     if (!response.ok) {
-      res.status(502).json({
+      res.status(response.status).json({
         error: "Failed to fetch remote",
         status: response.status
       });
@@ -29,8 +36,7 @@ export default async function handler(req, res) {
         const href = $(a).attr("href") || "";
         const text = $(a).text().trim();
 
-        // Ignorar diretórios parent
-        if (href === "../" || href === "/") return null;
+        if (!href || href === "../" || href === "/") return null;
 
         // Tentar extrair tamanho (Apache/Nginx index)
         let size = null;
@@ -45,7 +51,7 @@ export default async function handler(req, res) {
       })
       .filter(Boolean)
       .filter((f) =>
-        /\.(mkv|mp4|avi|m4v|webm|srt|txt|zip)$/i.test(f.href || f.text)
+        /\.(mkv|mp4|avi|m4v|webm|srt|txt|zip|rar|7z)$/i.test(f.href || f.text)
       )
       .map((f) => {
         const abs = new URL(f.href, url).href;
@@ -68,8 +74,8 @@ export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).json({ title, files });
   } catch (err) {
-    console.error(err);
+    console.error("Parser error:", err);
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.status(500).json({ error: "Internal error" });
+    res.status(500).json({ error: "Internal error", details: err.message });
   }
 }
